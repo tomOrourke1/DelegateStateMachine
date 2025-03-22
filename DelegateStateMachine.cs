@@ -1,127 +1,236 @@
 
-public class DelegateStateMachine
+using System;
+using System.Collections.Generic;
+
+
+// Note TO SELF
+// create a second delegate state machine that takes in a data object on the StateMachine level
+// then intrinsically pass it around the states/ have states have access to it
+// that way you can have best of both worlds?
+// the usecase being the animStates needing playing data?
+public class DelegateStateMachine<T> where T : Enum
 {
+    private Dictionary<T, TState<T>> states;
 
-    Dictionary<TState, List<TTransition>> stateTransitions;
-    List<TTransition> anyTransitions;
-
-    TState currentState;
+    T currState;
 
 
     public DelegateStateMachine()
     {
-        stateTransitions = new();
-        anyTransitions = new();
+        states = new();
+        currState = default;
     }
 
-    public void AddAnyTransition(TState to, Func<bool> cond)
-    {
-        anyTransitions.Add(new TTransition(from: null, to: to, cond: cond));
-    }
 
-    public void AddTransition(TState from, TState to, Func<bool> cond)
+    // need to add state
+    // need to configure state settings
+    // need to add state transitions
+
+    public TState<T> Configure(T state)
     {
-        if (!stateTransitions.ContainsKey(from))
+        // if default state is not set set it here
+        if (Convert.ToInt32(currState) == 0)
         {
-            stateTransitions.Add(from, new List<TTransition>());
+            currState = state;
         }
 
-        stateTransitions[from].Add(new TTransition(from, to, cond));
+
+        if (states.ContainsKey(state))
+        {
+            return states[state];
+        }
+        else
+        {
+            TState<T> st = new(state);
+            states.Add(state, st);
+
+            return st;
+        }
     }
 
-    public void SetState(TState state)
+    public void Check()
     {
-        currentState?.OnExit?.Invoke();
+        // if I want any transitions they would go here
+        // and the data would be stored in the State Machine itself
 
-        currentState = state;
+        var state = states[currState].CheckTransitions();
 
-        currentState?.OnEnter?.Invoke();
+        if (Convert.ToInt32(state) != 0) // if not null then set state
+        {
+            SetState(state);
+        }
     }
+
+    public void SetState(T state)
+    {
+        states[currState]?.Exit();
+        currState = state;
+        states[currState]?.Enter();
+    }
+
 
     public void Tick()
     {
-        var s = CheckTransition(currentState);
-        if (s != null)
-        {
-            SetState(s.To);
-        }
-
-        // currentState?.Tick?.Invoke();
-
-        currentState?.OnTick?.Invoke();
+        states[currState].Tick();
     }
 
-    public void FixedTick()
+
+    public void Fixed()
     {
-        currentState?.OnFixedTick?.Invoke();
-    }
-    public void LateTick()
-    {
-        currentState?.OnLateTick?.Invoke();
+        states[currState].Fixed();
     }
 
-    private TTransition CheckTransition(TState curr)
+    public void Late()
     {
-        foreach (var s in anyTransitions)
-        {
-            if (s.Cond())
-            {
-                return s;
-            }
-        }
-
-        if (stateTransitions.ContainsKey(curr))
-        {
-            foreach (var s in stateTransitions[curr])
-            {
-                if (s.Cond())
-                {
-                    return s;
-                }
-            }
-        }
-
-        return null;
+        states[currState].Late();
     }
 
 }
 
 
 
-
-public class TTransition
+public class TState<T> where T : Enum
 {
+    public delegate void Func();
 
-    public TState From;
-    public TState To;
-    public Func<bool> Cond;
+    private Func OnEnter;
+    private Func OnExit;
 
-    public TTransition(TState from, TState to, Func<bool> cond)
+    private Func OnTick;
+    private Func OnFixed;
+    private Func OnLate;
+
+
+    public readonly T State;
+
+    Dictionary<T, Func<bool>> transitions;
+
+
+    public TState(T state)
     {
-        From = from;
-        To = to;
-        Cond = cond;
+        State = state;
+        transitions = new();
     }
-}
 
-public class TState
-{
-
-    public delegate void Foo();
-
-    public Foo OnTick;
-    public Foo OnLateTick;
-    public Foo OnFixedTick;
-    public Foo OnEnter;
-    public Foo OnExit;
-
-    public TState(Foo tick = null, Foo lateTick = null, Foo fixedTick = null, Foo enter = null, Foo exit = null)
+    public TState<T> Transition(T to, Func<bool> cond)
     {
-        OnTick = tick;
-        OnLateTick = lateTick;
-        OnFixedTick = fixedTick;
-        OnEnter = enter;
-        OnExit = exit;
+        if (transitions.ContainsKey(to))
+        {
+            transitions[to] = cond;
+        }
+        else
+        {
+            transitions.Add(to, cond);
+        }
+
+        return this;
     }
+
+    public T CheckTransitions()
+    {
+        foreach (var train in transitions)
+        {
+            if (train.Value())
+            {
+                return train.Key;
+            }
+        }
+
+        return default;
+    }
+
+
+    public TState<T> AddTick(Func tick)
+    {
+        OnTick += tick;
+
+        return this;
+    }
+
+    public TState<T> RemTick(Func tick)
+    {
+        OnTick -= tick;
+
+        return this;
+    }
+
+    public TState<T> AddLate(Func late)
+    {
+        OnLate += late;
+
+        return this;
+    }
+    public TState<T> RemLate(Func late)
+    {
+        OnLate -= late;
+
+        return this;
+    }
+
+    public TState<T> AddFixed(Func @fixed)
+    {
+        OnFixed += @fixed;
+
+        return this;
+    }
+    public TState<T> RemFixed(Func @fixed)
+    {
+        OnFixed += @fixed;
+
+        return this;
+    }
+
+
+    public TState<T> AddEnter(Func enter)
+    {
+        OnEnter += enter;
+
+        return this;
+    }
+    public TState<T> RemEnter(Func enter)
+    {
+        OnEnter -= enter;
+
+        return this;
+    }
+
+    public TState<T> AddExit(Func exit)
+    {
+        OnExit += exit;
+
+        return this;
+    }
+    public TState<T> RemExit(Func exit)
+    {
+        OnExit -= exit;
+
+        return this;
+    }
+
+
+
+    public void Tick()
+    {
+        OnTick?.Invoke();
+    }
+    public void Late()
+    {
+        OnLate?.Invoke();
+    }
+    public void Fixed()
+    {
+        OnFixed?.Invoke();
+    }
+
+    public void Enter()
+    {
+        OnEnter?.Invoke();
+    }
+    public void Exit()
+    {
+        OnExit?.Invoke();
+    }
+
+
 
 }
