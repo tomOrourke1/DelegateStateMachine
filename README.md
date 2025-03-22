@@ -6,22 +6,25 @@ Example usage
 ```c#
 public class TestBehavious : MonoBehaviour
 {
-    DelegateStateMachine SM;
+    enum states
+    {
+        none,
+        playing,
+        menu
+    }
 
-    public TState playingState;
-    TState menuState;
+    DelegateStateMachine<states> SM;
 
     private void Awake()
     {
-        menuState = new(tick: Menu);
-        playingState = new(tick: Playing);
-
         SM = new();
 
-        SM.AddTransition(menuState, playingState, () => return Keyboard.current.spaceKey.waspressedthisframe);
-        SM.AddTransition(playingState, menuState, () => return Keyboard.current.spaceKey.waspressedthisframe);
+        SM.Configure(states.menu)
+            .AddTick(Menu)
+            .Transition(states.playing, () => return Keyboard.current.spaceKey.waspressedthisframe);
 
-        SM.SetState(menuState);
+        SM.Configure(states.playing).AddTick(Playing)
+            .Transition(states.menu, () => return Keyboard.current.spaceKey.waspressedthisframe);
     }
 
     void Menu()
@@ -35,6 +38,7 @@ public class TestBehavious : MonoBehaviour
 
     private void Update()
     {
+        SM.Check();
         SM.Tick();
     }
 }
