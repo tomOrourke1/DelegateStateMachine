@@ -26,6 +26,12 @@ public class DelegateStateMachine<T> where T : Enum
     // need to configure state settings
     // need to add state transitions
 
+    public void Init()
+    {
+        if (Convert.ToInt32(currState) != 0)
+            states[currState].Enter();
+    }
+
     public TState<T> Configure(T state)
     {
         // if default state is not set set it here
@@ -63,9 +69,11 @@ public class DelegateStateMachine<T> where T : Enum
 
     public void SetState(T state)
     {
-        states[currState]?.Exit();
+        if (states.ContainsKey(currState))
+            states[currState].Exit();
         currState = state;
-        states[currState]?.Enter();
+        if (states.ContainsKey(currState))
+            states[currState].Enter();
     }
 
 
