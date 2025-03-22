@@ -26,6 +26,8 @@ public class TestBehavious : MonoBehaviour
         SM.Configure(states.playing)
             .AddTick(Playing)
             .Transition(states.menu, () => return Keyboard.current.spaceKey.waspressedthisframe);
+
+        SM.Init();
     }
 
     void Menu()
